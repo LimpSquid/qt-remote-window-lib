@@ -16,6 +16,8 @@ public:
     virtual ~RemoteWindowSocket() override;
 
     void sendWindowCapture(const QByteArray &data);
+    void sendMouseMove(const QPoint &position);
+    void sendMouseClick(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifier &modifiers = Qt::KeyboardModifier());
 
 private:
     enum SessionState
@@ -37,6 +39,8 @@ private:
         SS_PROCESS_JOIN_SESSION_ACK,
         SS_PROCESS_LEAVE_SESSION,
         SS_PROCESS_WINDOW_CAPTURE,
+        SS_PROCESS_MOUSE_MOVE,
+        SS_PROCESS_MOUSE_CLICK,
 
         SS_ERROR,
         SS_DONE,
@@ -49,6 +53,8 @@ private:
         SC_JOIN_SESSION_ACK,
         SC_LEAVE_SESSION,
         SC_WINDOW_CAPTURE,
+        SC_MOUSE_MOVE,
+        SC_MOUSE_CLICK,
     };
 
     static const QMap<SocketCommand, SocketState> SOCKET_STATE_MAPPING;
@@ -65,6 +71,8 @@ private:
 
 signals:
     void windowCaptureReceived(const QByteArray &data);
+    void mouseMoveReceived(const QPoint &position);
+    void mouseClickReceived(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifier &modifiers);
 
 private slots:
     void process();

@@ -16,6 +16,9 @@ public:
     RemoteWindowServer(QWindow *window, unsigned short port = 55555);
     virtual ~RemoteWindowServer() override;
 
+    QWindow *window() const;
+    void setWindow(QWindow *value);
+
 private:
     static const int WINDOW_UPDATE_TIME_INTERVAL;
 
@@ -31,6 +34,8 @@ private:
     int windowUpdateTimerId_;
 
 private slots:
-    void socketDisconnected();
+    void onSocketDisconnected();
+    void onSocketMouseMoveReceived(const QPoint &position);
+    void onSocketMouseClickReceived(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifier &modifiers);
 };
 

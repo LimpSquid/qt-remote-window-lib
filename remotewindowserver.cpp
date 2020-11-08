@@ -4,6 +4,7 @@
 #include <QWindow>
 #include <QScreen>
 #include <QBuffer>
+#include <QTest>
 
 const int RemoteWindowServer::WINDOW_UPDATE_TIME_INTERVAL = 50; // 20fps
 
@@ -21,6 +22,16 @@ RemoteWindowServer::~RemoteWindowServer()
 
 }
 
+QWindow *RemoteWindowServer::window() const
+{
+    return window_;
+}
+
+void RemoteWindowServer::setWindow(QWindow *value)
+{
+    window_ = value;
+}
+
 void RemoteWindowServer::incomingConnection(qintptr handle)
 {
     if(sockets_.contains(handle)) {
@@ -29,8 +40,10 @@ void RemoteWindowServer::incomingConnection(qintptr handle)
     }
 
     RemoteWindowSocket *socket = new RemoteWindowSocket(handle, this);
-    QObject::connect(socket, &RemoteWindowSocket::disconnected, this, &RemoteWindowServer::socketDisconnected);
 
+    QObject::connect(socket, &RemoteWindowSocket::disconnected, this, &RemoteWindowServer::onSocketDisconnected);
+    QObject::connect(socket, &RemoteWindowSocket::mouseMoveReceived, this, &RemoteWindowServer::onSocketMouseMoveReceived);
+    QObject::connect(socket, &RemoteWindowSocket::mouseClickReceived, this, &RemoteWindowServer::onSocketMouseClickReceived);
     sockets_.insert(handle, socket);
 
     if(-1 == windowUpdateTimerId_)
@@ -45,6 +58,9 @@ void RemoteWindowServer::timerEvent(QTimerEvent *event)
 
 void RemoteWindowServer::handleWindowUpdate()
 {
+    if(nullptr == window_)
+        return;
+
     QScreen *screen = window_->screen();
     WId windowId = window_->winId();
     QByteArray data;
@@ -61,7 +77,7 @@ void RemoteWindowServer::handleWindowUpdate()
         socket->sendWindowCapture(data);
 }
 
-void RemoteWindowServer::socketDisconnected()
+void RemoteWindowServer::onSocketDisconnected()
 {
     RemoteWindowSocket *socket = static_cast<RemoteWindowSocket *>(QObject::sender());
     qintptr handle = socket->socketDescriptor();
@@ -73,4 +89,20 @@ void RemoteWindowServer::socketDisconnected()
         killTimer(windowUpdateTimerId_);
         windowUpdateTimerId_ = -1;
     }
+}
+
+void RemoteWindowServer::onSocketMouseMoveReceived(const QPoint &position)
+{
+    if(nullptr == window_)
+        return;
+
+    QTest::mouseMove(window_, position);
+}
+
+void RemoteWindowServer::onSocketMouseClickReceived(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifier &modifiers)
+{
+    if(nullptr == window_)
+        return;
+
+    QTest::mouseClick(window_, button, modifiers, position);
 }

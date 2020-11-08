@@ -1,5 +1,7 @@
 #include "remotewindowsocket.h"
 #include <QByteArray>
+#include <QDataStream>
+#include <QPoint>
 
 const QMap<RemoteWindowSocket::SocketCommand, RemoteWindowSocket::SocketState> RemoteWindowSocket::SOCKET_STATE_MAPPING =
 {
@@ -7,6 +9,8 @@ const QMap<RemoteWindowSocket::SocketCommand, RemoteWindowSocket::SocketState> R
     { RemoteWindowSocket::SC_JOIN_SESSION_ACK,  RemoteWindowSocket::SS_PROCESS_JOIN_SESSION_ACK },
     { RemoteWindowSocket::SC_LEAVE_SESSION,     RemoteWindowSocket::SS_PROCESS_LEAVE_SESSION    },
     { RemoteWindowSocket::SC_WINDOW_CAPTURE,    RemoteWindowSocket::SS_PROCESS_WINDOW_CAPTURE   },
+    { RemoteWindowSocket::SC_MOUSE_MOVE,        RemoteWindowSocket::SS_PROCESS_MOUSE_MOVE       },
+    { RemoteWindowSocket::SC_MOUSE_CLICK,       RemoteWindowSocket::SS_PROCESS_MOUSE_CLICK      },
 };
 
 RemoteWindowSocket::RemoteWindowSocket(QObject *parent) :
@@ -18,7 +22,7 @@ RemoteWindowSocket::RemoteWindowSocket(QObject *parent) :
     sessionState_ = SS_NO_SESSION;
 
     QObject::connect(this, &QTcpSocket::readyRead, this, &RemoteWindowSocket::process);
-    QObject::connect(this, &QTcpSocket::connected, [&] {
+    QObject::connect(this, &QTcpSocket::connected, [&]() {
         if(SS_NO_SESSION == sessionState_) {
             sessionState_ = SS_JOINING;
             sendJoinSession();
@@ -49,6 +53,36 @@ void RemoteWindowSocket::sendWindowCapture(const QByteArray &data)
 
     writer_.startMap(1);
     writer_.append(static_cast<int>(SC_WINDOW_CAPTURE));
+    writer_.append(data);
+    writer_.endMap();
+}
+
+void RemoteWindowSocket::sendMouseMove(const QPoint &position)
+{
+    if(sessionState_ != SS_JOINED)
+        return;
+
+    QByteArray data;
+    QDataStream stream(&data, QIODevice::WriteOnly);
+    stream << position;
+
+    writer_.startMap(1);
+    writer_.append(static_cast<int>(SC_MOUSE_MOVE));
+    writer_.append(data);
+    writer_.endMap();
+}
+
+void RemoteWindowSocket::sendMouseClick(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifier &modifiers)
+{
+    if(sessionState_ != SS_JOINED)
+        return;
+
+    QByteArray data;
+    QDataStream stream(&data, QIODevice::WriteOnly);
+    stream << static_cast<int>(button) << position << static_cast<int>(modifiers);
+
+    writer_.startMap(1);
+    writer_.append(static_cast<int>(SC_MOUSE_CLICK));
     writer_.append(data);
     writer_.endMap();
 }
@@ -149,6 +183,40 @@ void RemoteWindowSocket::process()
 
                     if(QCborStreamReader::EndOfString == result.status) {
                         emit windowCaptureReceived(byteArrayBuffer_);
+                        socketState_ = SS_READ_COMMAND_DONE;
+                    }
+                } else
+                    socketState_ = SS_ERROR;
+                break;
+            case SS_PROCESS_MOUSE_MOVE:
+                if(reader_.isByteArray()) {
+                    const auto &result = reader_.readByteArray();
+                    byteArrayBuffer_.append(result.data);
+
+                    if(QCborStreamReader::EndOfString == result.status) {
+                        QPoint position;
+                        QDataStream stream(&byteArrayBuffer_, QIODevice::ReadOnly);
+
+                        stream >> position;
+                        emit mouseMoveReceived(position);
+                        socketState_ = SS_READ_COMMAND_DONE;
+                    }
+                } else
+                    socketState_ = SS_ERROR;
+                break;
+            case SS_PROCESS_MOUSE_CLICK:
+                if(reader_.isByteArray()) {
+                    const auto &result = reader_.readByteArray();
+                    byteArrayBuffer_.append(result.data);
+
+                    if(QCborStreamReader::EndOfString == result.status) {
+                        int button;
+                        QPoint position;
+                        int modifiers;
+                        QDataStream stream(&byteArrayBuffer_, QIODevice::ReadOnly);
+
+                        stream >> button >> position >> modifiers;
+                        emit mouseClickReceived(static_cast<Qt::MouseButton>(button), position, static_cast<Qt::KeyboardModifier>(modifiers));
                         socketState_ = SS_READ_COMMAND_DONE;
                     }
                 } else
