@@ -197,6 +197,7 @@ void RemoteWindowSocket::process()
                 socketState_ = SS_READ_COMMAND_DONE;
                 break;
             case SS_PROCESS_LEAVE_SESSION:
+                sessionState_ = SS_LEAVING;
                 socketState_ = SS_DONE;
                 break;
             case SS_PROCESS_WINDOW_CAPTURE:
@@ -255,11 +256,10 @@ void RemoteWindowSocket::process()
 
             case SS_ERROR:
             case SS_DONE:
-                // Leave all containters and clear stream
-                while(reader_.containerDepth() > 0)
-                    reader_.leaveContainer();
+                // Clear stream and wait for join
                 reader_.clear();
                 socketState_ = SS_READ_JOIN;
+                sessionState_ = SS_NO_SESSION;
                 exit = true;
                 break;
         }
