@@ -10,6 +10,8 @@ const QMap<RemoteWindowSocket::SocketCommand, RemoteWindowSocket::SocketState> R
     { RemoteWindowSocket::SC_LEAVE_SESSION,     RemoteWindowSocket::SS_PROCESS_LEAVE_SESSION    },
     { RemoteWindowSocket::SC_WINDOW_CAPTURE,    RemoteWindowSocket::SS_PROCESS_WINDOW_CAPTURE   },
     { RemoteWindowSocket::SC_MOUSE_MOVE,        RemoteWindowSocket::SS_PROCESS_MOUSE_MOVE       },
+    { RemoteWindowSocket::SC_MOUSE_PRESS,       RemoteWindowSocket::SS_PROCESS_MOUSE_PRESS      },
+    { RemoteWindowSocket::SC_MOUSE_RELEASE,     RemoteWindowSocket::SS_PROCESS_MOUSE_RELEASE    },
     { RemoteWindowSocket::SC_MOUSE_CLICK,       RemoteWindowSocket::SS_PROCESS_MOUSE_CLICK      },
 };
 
@@ -72,19 +74,28 @@ void RemoteWindowSocket::sendMouseMove(const QPoint &position)
     writer_.endMap();
 }
 
-void RemoteWindowSocket::sendMouseClick(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifier &modifiers)
+void RemoteWindowSocket::sendMousePress(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifiers &modifiers)
 {
     if(sessionState_ != SS_JOINED)
         return;
 
-    QByteArray data;
-    QDataStream stream(&data, QIODevice::WriteOnly);
-    stream << static_cast<int>(button) << position << static_cast<int>(modifiers);
+    sendMouseEvent(SC_MOUSE_PRESS, button, position, modifiers);
+}
 
-    writer_.startMap(1);
-    writer_.append(static_cast<int>(SC_MOUSE_CLICK));
-    writer_.append(data);
-    writer_.endMap();
+void RemoteWindowSocket::sendMouseRelease(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifiers &modifiers)
+{
+    if(sessionState_ != SS_JOINED)
+        return;
+
+    sendMouseEvent(SC_MOUSE_RELEASE, button, position, modifiers);
+}
+
+void RemoteWindowSocket::sendMouseClick(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifiers &modifiers)
+{
+    if(sessionState_ != SS_JOINED)
+        return;
+
+    sendMouseEvent(SC_MOUSE_CLICK, button, position, modifiers);
 }
 
 void RemoteWindowSocket::sendJoinSession()
@@ -115,6 +126,18 @@ void RemoteWindowSocket::sendLeaveSession()
     writer_.endMap();
 
     writer_.endArray();
+}
+
+void RemoteWindowSocket::sendMouseEvent(const RemoteWindowSocket::SocketCommand &command, const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifiers &modifiers)
+{
+    QByteArray data;
+    QDataStream stream(&data, QIODevice::WriteOnly);
+    stream << static_cast<int>(button) << position << static_cast<int>(modifiers);
+
+    writer_.startMap(1);
+    writer_.append(static_cast<int>(command));
+    writer_.append(data);
+    writer_.endMap();
 }
 
 void RemoteWindowSocket::process()
@@ -204,6 +227,8 @@ void RemoteWindowSocket::process()
                 } else
                     socketState_ = SS_ERROR;
                 break;
+            case SS_PROCESS_MOUSE_PRESS:
+            case SS_PROCESS_MOUSE_RELEASE:
             case SS_PROCESS_MOUSE_CLICK:
                 if(reader_.isByteArray()) {
                     const auto &result = reader_.readByteArray();
@@ -216,7 +241,12 @@ void RemoteWindowSocket::process()
                         QDataStream stream(&byteArrayBuffer_, QIODevice::ReadOnly);
 
                         stream >> button >> position >> modifiers;
-                        emit mouseClickReceived(static_cast<Qt::MouseButton>(button), position, static_cast<Qt::KeyboardModifier>(modifiers));
+                        if(SS_PROCESS_MOUSE_PRESS == socketState_)
+                            emit mousePressReceived(static_cast<Qt::MouseButton>(button), position, static_cast<Qt::KeyboardModifiers>(modifiers));
+                        else if(SS_PROCESS_MOUSE_RELEASE == socketState_)
+                            emit mouseReleaseReceived(static_cast<Qt::MouseButton>(button), position, static_cast<Qt::KeyboardModifiers>(modifiers));
+                        else if(SS_PROCESS_MOUSE_CLICK == socketState_)
+                            emit mouseClickReceived(static_cast<Qt::MouseButton>(button), position, static_cast<Qt::KeyboardModifiers>(modifiers));
                         socketState_ = SS_READ_COMMAND_DONE;
                     }
                 } else

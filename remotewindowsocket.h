@@ -17,7 +17,9 @@ public:
 
     void sendWindowCapture(const QByteArray &data);
     void sendMouseMove(const QPoint &position);
-    void sendMouseClick(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifier &modifiers = Qt::KeyboardModifier());
+    void sendMousePress(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifiers &modifiers = Qt::KeyboardModifier());
+    void sendMouseRelease(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifiers &modifiers = Qt::KeyboardModifier());
+    void sendMouseClick(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifiers &modifiers = Qt::KeyboardModifier());
 
 private:
     enum SessionState
@@ -40,6 +42,8 @@ private:
         SS_PROCESS_LEAVE_SESSION,
         SS_PROCESS_WINDOW_CAPTURE,
         SS_PROCESS_MOUSE_MOVE,
+        SS_PROCESS_MOUSE_PRESS,
+        SS_PROCESS_MOUSE_RELEASE,
         SS_PROCESS_MOUSE_CLICK,
 
         SS_ERROR,
@@ -54,6 +58,8 @@ private:
         SC_LEAVE_SESSION,
         SC_WINDOW_CAPTURE,
         SC_MOUSE_MOVE,
+        SC_MOUSE_PRESS,
+        SC_MOUSE_RELEASE,
         SC_MOUSE_CLICK,
     };
 
@@ -62,6 +68,7 @@ private:
     void sendJoinSession();
     void sendJoinSessionAck();
     void sendLeaveSession();
+    void sendMouseEvent(const SocketCommand &command, const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifiers &modifiers);
 
     QCborStreamWriter writer_;
     QCborStreamReader reader_;
@@ -72,7 +79,9 @@ private:
 signals:
     void windowCaptureReceived(const QByteArray &data);
     void mouseMoveReceived(const QPoint &position);
-    void mouseClickReceived(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifier &modifiers);
+    void mousePressReceived(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifiers &modifiers);
+    void mouseReleaseReceived(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifiers &modifiers);
+    void mouseClickReceived(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifiers &modifiers);
 
 private slots:
     void process();

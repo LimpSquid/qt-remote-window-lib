@@ -28,14 +28,14 @@ private:
     void handleWindowUpdate();
 
     QWindow *window_;
-
     QMap<qintptr, RemoteWindowSocket *> sockets_;
-
     int windowUpdateTimerId_;
 
 private slots:
     void onSocketDisconnected();
     void onSocketMouseMoveReceived(const QPoint &position);
-    void onSocketMouseClickReceived(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifier &modifiers);
+    void onSocketMousePressReceived(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifiers &modifiers);
+    void onSocketMouseReleaseReceived(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifiers &modifiers);
+    void onSocketMouseClickReceived(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifiers &modifiers);
 };
 

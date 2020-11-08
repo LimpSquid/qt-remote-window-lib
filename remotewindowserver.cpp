@@ -43,6 +43,8 @@ void RemoteWindowServer::incomingConnection(qintptr handle)
 
     QObject::connect(socket, &RemoteWindowSocket::disconnected, this, &RemoteWindowServer::onSocketDisconnected);
     QObject::connect(socket, &RemoteWindowSocket::mouseMoveReceived, this, &RemoteWindowServer::onSocketMouseMoveReceived);
+    QObject::connect(socket, &RemoteWindowSocket::mousePressReceived, this, &RemoteWindowServer::onSocketMousePressReceived);
+    QObject::connect(socket, &RemoteWindowSocket::mouseReleaseReceived, this, &RemoteWindowServer::onSocketMouseReleaseReceived);
     QObject::connect(socket, &RemoteWindowSocket::mouseClickReceived, this, &RemoteWindowServer::onSocketMouseClickReceived);
     sockets_.insert(handle, socket);
 
@@ -99,7 +101,23 @@ void RemoteWindowServer::onSocketMouseMoveReceived(const QPoint &position)
     QTest::mouseMove(window_, position);
 }
 
-void RemoteWindowServer::onSocketMouseClickReceived(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifier &modifiers)
+void RemoteWindowServer::onSocketMousePressReceived(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifiers &modifiers)
+{
+    if(nullptr == window_)
+        return;
+
+    QTest::mousePress(window_, button, modifiers, position);
+}
+
+void RemoteWindowServer::onSocketMouseReleaseReceived(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifiers &modifiers)
+{
+    if(nullptr == window_)
+        return;
+
+    QTest::mouseRelease(window_, button, modifiers, position);
+}
+
+void RemoteWindowServer::onSocketMouseClickReceived(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifiers &modifiers)
 {
     if(nullptr == window_)
         return;
