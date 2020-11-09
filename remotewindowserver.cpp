@@ -8,13 +8,19 @@
 
 const int RemoteWindowServer::WINDOW_UPDATE_TIME_INTERVAL = 50; // 20fps
 
-RemoteWindowServer::RemoteWindowServer(QWindow *window, unsigned short port) :
-    QTcpServer(window)
+RemoteWindowServer::RemoteWindowServer(QObject *parent, unsigned short port) :
+    QTcpServer(parent)
 {
-    window_ = window;
+    window_ = nullptr;
     windowUpdateTimerId_ = -1;
 
     listen(QHostAddress::Any, port);
+}
+
+RemoteWindowServer::RemoteWindowServer(QWindow *window, QObject *parent, unsigned short port) :
+    RemoteWindowServer(parent, port)
+{
+    window_ = window;
 }
 
 RemoteWindowServer::~RemoteWindowServer()
@@ -34,11 +40,6 @@ void RemoteWindowServer::setWindow(QWindow *value)
 
 void RemoteWindowServer::incomingConnection(qintptr handle)
 {
-    if(sockets_.contains(handle)) {
-        sockets_[handle]->deleteLater();
-        sockets_.remove(handle);
-    }
-
     RemoteWindowSocket *socket = new RemoteWindowSocket(handle, this);
 
     QObject::connect(socket, &RemoteWindowSocket::disconnected, this, &RemoteWindowServer::onSocketDisconnected);
@@ -46,7 +47,7 @@ void RemoteWindowServer::incomingConnection(qintptr handle)
     QObject::connect(socket, &RemoteWindowSocket::mousePressReceived, this, &RemoteWindowServer::onSocketMousePressReceived);
     QObject::connect(socket, &RemoteWindowSocket::mouseReleaseReceived, this, &RemoteWindowServer::onSocketMouseReleaseReceived);
     QObject::connect(socket, &RemoteWindowSocket::mouseClickReceived, this, &RemoteWindowServer::onSocketMouseClickReceived);
-    sockets_.insert(handle, socket);
+    sockets_.append(socket);
 
     if(-1 == windowUpdateTimerId_)
         windowUpdateTimerId_ = startTimer(WINDOW_UPDATE_TIME_INTERVAL);
@@ -63,15 +64,14 @@ void RemoteWindowServer::handleWindowUpdate()
     if(nullptr == window_)
         return;
 
-    QScreen *screen = window_->screen();
-    WId windowId = window_->winId();
+    QScreen *screen = QGuiApplication::primaryScreen();
     QByteArray data;
     QBuffer buffer(&data);
 
     if(!buffer.open(QBuffer::WriteOnly))
         return;
 
-    QPixmap pixmap = screen->grabWindow(windowId);
+    QPixmap pixmap = screen->grabWindow(0, window_->x(), window_->y(), window_->width(), window_->height());
     if(!pixmap.save(&buffer, "jpg"))
         return;
 
@@ -82,10 +82,9 @@ void RemoteWindowServer::handleWindowUpdate()
 void RemoteWindowServer::onSocketDisconnected()
 {
     RemoteWindowSocket *socket = static_cast<RemoteWindowSocket *>(QObject::sender());
-    qintptr handle = socket->socketDescriptor();
 
     socket->deleteLater();
-    sockets_.remove(handle);
+    sockets_.removeAll(socket);
 
     if(sockets_.isEmpty()) {
         killTimer(windowUpdateTimerId_);

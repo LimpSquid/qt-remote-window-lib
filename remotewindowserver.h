@@ -13,7 +13,8 @@ class RemoteWindowServer : public QTcpServer
     Q_DISABLE_COPY(RemoteWindowServer)
 
 public:
-    RemoteWindowServer(QWindow *window, unsigned short port = 55555);
+    RemoteWindowServer(QObject *parent = nullptr, unsigned short port = 55555);
+    RemoteWindowServer(QWindow *window, QObject *parent = nullptr, unsigned short port = 55555);
     virtual ~RemoteWindowServer() override;
 
     QWindow *window() const;
@@ -28,7 +29,7 @@ private:
     void handleWindowUpdate();
 
     QWindow *window_;
-    QMap<qintptr, RemoteWindowSocket *> sockets_;
+    QList<RemoteWindowSocket *> sockets_;
     int windowUpdateTimerId_;
 
 private slots:
