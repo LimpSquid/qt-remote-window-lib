@@ -71,7 +71,11 @@ void RemoteWindowServer::handleWindowUpdate()
     if(!buffer.open(QBuffer::WriteOnly))
         return;
 
+#ifdef Q_WS_WIN
     QPixmap pixmap = screen->grabWindow(0, window_->x(), window_->y(), window_->width(), window_->height());
+#else
+    QPixmap pixmap = screen->grabWindow(window_->winId());
+#endif
     if(!pixmap.save(&buffer, "jpg"))
         return;
 

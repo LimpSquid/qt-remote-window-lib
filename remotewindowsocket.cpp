@@ -59,6 +59,9 @@ void RemoteWindowSocket::sendWindowCapture(const QByteArray &data)
 
 void RemoteWindowSocket::sendMouseMove(const QPoint &position)
 {
+    if(sessionState_ != SS_JOINED)
+        return;
+
     QByteArray data;
     QDataStream stream(&data, QIODevice::WriteOnly);
     stream << position;
@@ -68,58 +71,72 @@ void RemoteWindowSocket::sendMouseMove(const QPoint &position)
 
 void RemoteWindowSocket::sendMousePress(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifiers &modifiers)
 {
+    if(sessionState_ != SS_JOINED)
+        return;
+
     sendMouseEvent(SC_MOUSE_PRESS, button, position, modifiers);
 }
 
 void RemoteWindowSocket::sendMouseRelease(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifiers &modifiers)
 {
+    if(sessionState_ != SS_JOINED)
+        return;
+
     sendMouseEvent(SC_MOUSE_RELEASE, button, position, modifiers);
 }
 
 void RemoteWindowSocket::sendMouseClick(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifiers &modifiers)
 {
+    if(sessionState_ != SS_JOINED)
+        return;
+
     sendMouseEvent(SC_MOUSE_CLICK, button, position, modifiers);
 }
 
 bool RemoteWindowSocket::sendMessage(const SocketCommand &command, const QByteArray &data)
 {
-    if(sessionState_ != SS_JOINED)
-        return false;
-
     QByteArray message;
+    QByteArray encodedPayload = data.toBase64();
 
     message.append(MESSAGE_START_MARKER);
-    message.append(QString::number(command).toLocal8Bit().toBase64());
+    message.append(QString::number(command).toUtf8().toBase64());
     message.append(MESSAGE_PAYLOAD_SIZE_MARKER);
-    message.append(QString::number(data.size()));
+    message.append(QString::number(encodedPayload.size()).toUtf8().toBase64());
     message.append(MESSAGE_PAYLOAD_MARKER);
-    message.append(data.toBase64());
-    return write(message) == data.size();
+    message.append(encodedPayload);
+    message.append(MESSAGE_END_MARKER);
+    return write(message) == message.size();
 }
 
 void RemoteWindowSocket::readMessage()
 {
-    buffer_.append(readAll());
+    bool exit;
 
-    int indexOfStart = buffer_.indexOf(MESSAGE_START_MARKER);
-    int indexOfPayloadSize = buffer_.indexOf(MESSAGE_START_MARKER);
-    int indexOfPayload = buffer_.indexOf(MESSAGE_START_MARKER);
+    do {
+        exit = true;
+        buffer_.append(readAll());
 
-    // Check if message header is present
-    if(indexOfStart >= 0 && indexOfPayloadSize >= 0 && indexOfPayload >=0) {
-        bool ok = false;
-        int payloadSize = QByteArray::fromBase64(buffer_.mid(indexOfPayloadSize + 1, indexOfPayload - indexOfPayloadSize - 1)).toInt(&ok);
-        int indexOfEnd = indexOfPayload + payloadSize + 1;
+        int indexOfStart = buffer_.indexOf(MESSAGE_START_MARKER);
+        int indexOfPayloadSize = buffer_.indexOf(MESSAGE_PAYLOAD_SIZE_MARKER);
+        int indexOfPayload = buffer_.indexOf(MESSAGE_PAYLOAD_MARKER);
 
-        if(ok && indexOfEnd < buffer_.size() && buffer_.at(indexOfEnd) == MESSAGE_END_MARKER) {
-            Message msg;
-            msg.command = static_cast<SocketCommand>(QByteArray::fromBase64(buffer_.mid(indexOfStart + 1, indexOfPayloadSize - indexOfStart - 1)).toInt());
-            msg.payload = QByteArray::fromBase64(buffer_.mid(indexOfPayload + 1, payloadSize));
-            messageQueue_.enqueue(msg);
+        // Check if message header is present
+        if(indexOfStart >= 0 && indexOfPayloadSize >= 0 && indexOfPayload >= 0) {
+            bool ok = false;
+            int payloadSize = QByteArray::fromBase64(buffer_.mid(indexOfPayloadSize + 1, indexOfPayload - indexOfPayloadSize - 1)).toInt(&ok);
+            int indexOfEnd = indexOfPayload + payloadSize + 1;
 
-            buffer_.remove(indexOfStart, indexOfEnd - indexOfStart);
+            if(ok && indexOfEnd < buffer_.size() && buffer_.at(indexOfEnd) == MESSAGE_END_MARKER) {
+                Message msg;
+                msg.command = static_cast<SocketCommand>(QByteArray::fromBase64(buffer_.mid(indexOfStart + 1, indexOfPayloadSize - indexOfStart - 1)).toInt());
+                msg.payload = QByteArray::fromBase64(buffer_.mid(indexOfPayload + 1, payloadSize));
+                messageQueue_.enqueue(msg);
+
+                buffer_.remove(indexOfStart, indexOfEnd - indexOfStart + 1);
+                exit = false;
+            }
         }
-    }
+    } while(!exit);
 }
 
 void RemoteWindowSocket::sendJoinSession()
@@ -137,13 +154,13 @@ void RemoteWindowSocket::sendLeaveSession()
     sendMessage(SC_LEAVE_SESSION);
 }
 
-void RemoteWindowSocket::sendMouseEvent(const RemoteWindowSocket::SocketCommand &command, const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifiers &modifiers)
+void RemoteWindowSocket::sendMouseEvent(const SocketCommand &command, const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifiers &modifiers)
 {
     QByteArray data;
     QDataStream stream(&data, QIODevice::WriteOnly);
 
     stream << static_cast<int>(button) << position << static_cast<int>(modifiers);
-    sendMessage(command);
+    sendMessage(command, data);
 }
 
 void RemoteWindowSocket::process()
