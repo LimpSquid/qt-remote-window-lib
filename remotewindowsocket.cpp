@@ -96,14 +96,13 @@ void RemoteWindowSocket::sendMouseClick(const Qt::MouseButton &button, const QPo
 bool RemoteWindowSocket::sendMessage(const SocketCommand &command, const QByteArray &data)
 {
     QByteArray message;
-    QByteArray encodedPayload = data.toBase64();
 
     message.append(MESSAGE_START_MARKER);
     message.append(QString::number(command).toUtf8().toBase64());
     message.append(MESSAGE_PAYLOAD_SIZE_MARKER);
-    message.append(QString::number(encodedPayload.size()).toUtf8().toBase64());
+    message.append(QString::number(data.size()).toUtf8().toBase64());
     message.append(MESSAGE_PAYLOAD_MARKER);
-    message.append(encodedPayload);
+    message.append(data);
     message.append(MESSAGE_END_MARKER);
     return write(message) == message.size();
 }
@@ -129,7 +128,7 @@ void RemoteWindowSocket::readMessage()
             if(ok && indexOfEnd < buffer_.size() && buffer_.at(indexOfEnd) == MESSAGE_END_MARKER) {
                 Message msg;
                 msg.command = static_cast<SocketCommand>(QByteArray::fromBase64(buffer_.mid(indexOfStart + 1, indexOfPayloadSize - indexOfStart - 1)).toInt());
-                msg.payload = QByteArray::fromBase64(buffer_.mid(indexOfPayload + 1, payloadSize));
+                msg.payload = buffer_.mid(indexOfPayload + 1, payloadSize);
                 messageQueue_.enqueue(msg);
 
                 buffer_.remove(indexOfStart, indexOfEnd - indexOfStart + 1);

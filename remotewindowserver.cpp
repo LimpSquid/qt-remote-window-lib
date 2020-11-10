@@ -6,15 +6,16 @@
 #include <QBuffer>
 #include <QTest>
 
-const int RemoteWindowServer::WINDOW_UPDATE_TIME_INTERVAL = 50; // 20fps
+const int RemoteWindowServer::WINDOW_UPDATE_TIME_INTERVAL = 125; // 8fps
 
 RemoteWindowServer::RemoteWindowServer(QObject *parent, unsigned short port) :
     QTcpServer(parent)
 {
     window_ = nullptr;
+    screenShotFunction_ = nullptr;
     windowUpdateTimerId_ = -1;
+    port_ = port;
 
-    listen(QHostAddress::Any, port);
 }
 
 RemoteWindowServer::RemoteWindowServer(QWindow *window, QObject *parent, unsigned short port) :
@@ -28,6 +29,23 @@ RemoteWindowServer::~RemoteWindowServer()
 
 }
 
+bool RemoteWindowServer::start()
+{
+    if(isListening())
+        return false;
+
+    return listen(QHostAddress::Any, port_);
+}
+
+void RemoteWindowServer::stop()
+{
+    if(!isListening())
+        return;
+
+    close();
+    qDeleteAll(sockets_);
+}
+
 QWindow *RemoteWindowServer::window() const
 {
     return window_;
@@ -36,6 +54,26 @@ QWindow *RemoteWindowServer::window() const
 void RemoteWindowServer::setWindow(QWindow *value)
 {
     window_ = value;
+}
+
+unsigned short RemoteWindowServer::port() const
+{
+    return port_;
+}
+
+void RemoteWindowServer::setPort(unsigned short port)
+{
+    port_ = port;
+}
+
+RemoteWindowServer::ScreenShotFunction RemoteWindowServer::screenShotFunction() const
+{
+    return screenShotFunction_;
+}
+
+void RemoteWindowServer::setScreenShotFunction(ScreenShotFunction value)
+{
+    screenShotFunction_ = value;
 }
 
 void RemoteWindowServer::incomingConnection(qintptr handle)
@@ -64,19 +102,25 @@ void RemoteWindowServer::handleWindowUpdate()
     if(nullptr == window_)
         return;
 
-    QScreen *screen = QGuiApplication::primaryScreen();
     QByteArray data;
     QBuffer buffer(&data);
 
     if(!buffer.open(QBuffer::WriteOnly))
         return;
 
+    QPixmap pixmap;
+
+    if(nullptr == screenShotFunction_) {
+        QScreen *screen = QGuiApplication::primaryScreen();
 #ifdef Q_WS_WIN
-    QPixmap pixmap = screen->grabWindow(0, window_->x(), window_->y(), window_->width(), window_->height());
+        QPixmap pixmap = screen->grabWindow(0, window_->x(), window_->y(), window_->width(), window_->height());
 #else
-    QPixmap pixmap = screen->grabWindow(window_->winId());
+        pixmap = screen->grabWindow(window_->winId());
 #endif
-    if(!pixmap.save(&buffer, "jpg"))
+    } else
+        pixmap = screenShotFunction_(window_);
+
+    if(!pixmap.save(&buffer, "jpeg", 30))
         return;
 
     for(RemoteWindowSocket *socket : sockets_)
