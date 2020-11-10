@@ -1,9 +1,8 @@
 #pragma once
 
 #include <QTcpSocket>
-#include <QCborStreamWriter>
-#include <QCborStreamReader>
 #include <QMap>
+#include <QQueue>
 
 class RemoteWindowSocket : public QTcpSocket
 {
@@ -27,13 +26,11 @@ private:
         SS_NO_SESSION,
         SS_JOINING,
         SS_JOINED,
-        SS_LEAVING,
     };
 
     enum SocketState
     {
-        SS_READ_JOIN = 0,
-        SS_READ_STREAM,
+        SS_READ_MESSAGE,
         SS_READ_COMMAND,
         SS_READ_COMMAND_DONE,
 
@@ -45,9 +42,6 @@ private:
         SS_PROCESS_MOUSE_PRESS,
         SS_PROCESS_MOUSE_RELEASE,
         SS_PROCESS_MOUSE_CLICK,
-
-        SS_ERROR,
-        SS_DONE,
     };
 
     enum SocketCommand
@@ -63,18 +57,31 @@ private:
         SC_MOUSE_CLICK,
     };
 
+    struct Message
+    {
+        SocketCommand command;
+        QByteArray payload;
+    };
+
     static const QMap<SocketCommand, SocketState> SOCKET_STATE_MAPPING;
+    static const char MESSAGE_START_MARKER;
+    static const char MESSAGE_END_MARKER;
+    static const char MESSAGE_PAYLOAD_SIZE_MARKER;
+    static const char MESSAGE_PAYLOAD_MARKER;
+
+    bool sendMessage(const SocketCommand &command, const QByteArray &data = QByteArray());
+    void readMessage();
 
     void sendJoinSession();
     void sendJoinSessionAck();
     void sendLeaveSession();
     void sendMouseEvent(const SocketCommand &command, const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifiers &modifiers);
 
-    QCborStreamWriter writer_;
-    QCborStreamReader reader_;
+    QQueue<Message> messageQueue_;
     SocketState socketState_;
     SessionState sessionState_;
-    QByteArray byteArrayBuffer_;
+    Message message_;
+    QByteArray buffer_;
 
 signals:
     void windowCaptureReceived(const QByteArray &data);
