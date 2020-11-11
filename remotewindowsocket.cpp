@@ -26,6 +26,7 @@ RemoteWindowSocket::RemoteWindowSocket(QObject *parent) :
     socketState_ = SS_READ_MESSAGE;
     sessionState_ = SS_NO_SESSION;
 
+    QObject::connect(this, &QTcpSocket::stateChanged, this, &RemoteWindowSocket::onStateChanged);
     QObject::connect(this, &QTcpSocket::readyRead, this, &RemoteWindowSocket::process);
     QObject::connect(this, &QTcpSocket::connected, [&]() {
         if(SS_NO_SESSION == sessionState_) {
@@ -235,5 +236,18 @@ void RemoteWindowSocket::process()
                 break;
             }
         }
+    }
+}
+
+void RemoteWindowSocket::onStateChanged(const QAbstractSocket::SocketState &state)
+{
+    switch(state) {
+        default:
+            break;
+        case UnconnectedState:
+            // Session lost...
+            if(SS_NO_SESSION != sessionState_)
+                sessionState_ = SS_NO_SESSION;
+            break;
     }
 }

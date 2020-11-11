@@ -92,4 +92,5 @@ signals:
 
 private slots:
     void process();
+    void onStateChanged(const QAbstractSocket::SocketState &state);
 };
