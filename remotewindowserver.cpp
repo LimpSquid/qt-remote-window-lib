@@ -15,7 +15,6 @@ RemoteWindowServer::RemoteWindowServer(QObject *parent, unsigned short port) :
     screenShotFunction_ = nullptr;
     windowUpdateTimerId_ = -1;
     port_ = port;
-
 }
 
 RemoteWindowServer::RemoteWindowServer(QWindow *window, QObject *parent, unsigned short port) :
@@ -85,6 +84,8 @@ void RemoteWindowServer::incomingConnection(qintptr handle)
     QObject::connect(socket, &RemoteWindowSocket::mousePressReceived, this, &RemoteWindowServer::onSocketMousePressReceived);
     QObject::connect(socket, &RemoteWindowSocket::mouseReleaseReceived, this, &RemoteWindowServer::onSocketMouseReleaseReceived);
     QObject::connect(socket, &RemoteWindowSocket::mouseClickReceived, this, &RemoteWindowServer::onSocketMouseClickReceived);
+    QObject::connect(socket, &RemoteWindowSocket::keyPressReceived, this, &RemoteWindowServer::onSocketKeyPressReceived);
+    QObject::connect(socket, &RemoteWindowSocket::keyReleaseReceived, this, &RemoteWindowServer::onSocketKeyReleaseReceived);
     sockets_.append(socket);
 
     if(-1 == windowUpdateTimerId_)
@@ -161,7 +162,7 @@ void RemoteWindowServer::onSocketMouseReleaseReceived(const Qt::MouseButton &but
     if(nullptr == window_)
         return;
 
-    QTest::mouseRelease(window_, button, modifiers, position);
+    QTest::mouseRelease(window_, button, modifiers, position);    
 }
 
 void RemoteWindowServer::onSocketMouseClickReceived(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifiers &modifiers)
@@ -170,4 +171,20 @@ void RemoteWindowServer::onSocketMouseClickReceived(const Qt::MouseButton &butto
         return;
 
     QTest::mouseClick(window_, button, modifiers, position);
+}
+
+void RemoteWindowServer::onSocketKeyPressReceived(const Qt::Key &key, const Qt::KeyboardModifiers &modifiers)
+{
+    if(nullptr == window_)
+        return;
+
+    QTest::keyPress(window_, key, modifiers);
+}
+
+void RemoteWindowServer::onSocketKeyReleaseReceived(const Qt::Key &key, const Qt::KeyboardModifiers &modifiers)
+{
+    if(nullptr == window_)
+        return;
+
+    QTest::keyRelease(window_, key, modifiers);
 }

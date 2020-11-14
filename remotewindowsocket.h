@@ -10,17 +10,6 @@ class RemoteWindowSocket : public QTcpSocket
     Q_DISABLE_COPY(RemoteWindowSocket)
 
 public:
-    RemoteWindowSocket(QObject *parent = nullptr);
-    RemoteWindowSocket(qintptr handle, QObject *parent = nullptr);
-    virtual ~RemoteWindowSocket() override;
-
-    void sendWindowCapture(const QByteArray &data);
-    void sendMouseMove(const QPoint &position);
-    void sendMousePress(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifiers &modifiers = Qt::KeyboardModifier());
-    void sendMouseRelease(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifiers &modifiers = Qt::KeyboardModifier());
-    void sendMouseClick(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifiers &modifiers = Qt::KeyboardModifier());
-
-private:
     enum SessionState
     {
         SS_NO_SESSION,
@@ -28,6 +17,21 @@ private:
         SS_JOINED,
     };
 
+    RemoteWindowSocket(QObject *parent = nullptr);
+    RemoteWindowSocket(qintptr handle, QObject *parent = nullptr);
+    virtual ~RemoteWindowSocket() override;
+
+    SessionState sessionState() const;
+
+    void sendWindowCapture(const QByteArray &data);
+    void sendMouseMove(const QPoint &position);
+    void sendMousePress(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifiers &modifiers = Qt::KeyboardModifier());
+    void sendMouseRelease(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifiers &modifiers = Qt::KeyboardModifier());
+    void sendMouseClick(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifiers &modifiers = Qt::KeyboardModifier());
+    void sendKeyPress(const Qt::Key &key, const Qt::KeyboardModifiers &modifiers = Qt::KeyboardModifiers());
+    void sendKeyRelease(const Qt::Key &key, const Qt::KeyboardModifiers &modifiers = Qt::KeyboardModifiers());
+
+private:
     enum SocketState
     {
         SS_READ_MESSAGE,
@@ -42,6 +46,8 @@ private:
         SS_PROCESS_MOUSE_PRESS,
         SS_PROCESS_MOUSE_RELEASE,
         SS_PROCESS_MOUSE_CLICK,
+        SS_PROCESS_KEY_PRESS,
+        SS_PROCESS_KEY_RELEASE,
     };
 
     enum SocketCommand
@@ -55,6 +61,8 @@ private:
         SC_MOUSE_PRESS,
         SC_MOUSE_RELEASE,
         SC_MOUSE_CLICK,
+        SC_KEY_PRESS,
+        SC_KEY_RELEASE,
     };
 
     struct Message
@@ -64,6 +72,7 @@ private:
     };
 
     static const QMap<SocketCommand, SocketState> SOCKET_STATE_MAPPING;
+    static const int  BUFFER_MAX_SIZE = 1024 * 20;
     static const char MESSAGE_START_MARKER;
     static const char MESSAGE_END_MARKER;
     static const char MESSAGE_PAYLOAD_SIZE_MARKER;
@@ -76,6 +85,9 @@ private:
     void sendJoinSessionAck();
     void sendLeaveSession();
     void sendMouseEvent(const SocketCommand &command, const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifiers &modifiers);
+    void sendKeyEvent(const SocketCommand &command, const Qt::Key &key, const Qt::KeyboardModifiers &modifiers);
+
+    void setSessionState(const SessionState &value);
 
     QQueue<Message> messageQueue_;
     SocketState socketState_;
@@ -89,6 +101,9 @@ signals:
     void mousePressReceived(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifiers &modifiers);
     void mouseReleaseReceived(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifiers &modifiers);
     void mouseClickReceived(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifiers &modifiers);
+    void keyPressReceived(const Qt::Key &key, const Qt::KeyboardModifiers &modifiers);
+    void keyReleaseReceived(const Qt::Key &key, const Qt::KeyboardModifiers &modifiers);
+    void sessionStateChanged();
 
 private slots:
     void process();

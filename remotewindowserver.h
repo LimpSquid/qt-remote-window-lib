@@ -51,4 +51,6 @@ private slots:
     void onSocketMousePressReceived(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifiers &modifiers);
     void onSocketMouseReleaseReceived(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifiers &modifiers);
     void onSocketMouseClickReceived(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifiers &modifiers);
+    void onSocketKeyPressReceived(const Qt::Key &key, const Qt::KeyboardModifiers &modifiers);
+    void onSocketKeyReleaseReceived(const Qt::Key &key, const Qt::KeyboardModifiers &modifiers);
 };

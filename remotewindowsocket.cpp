@@ -13,6 +13,8 @@ const QMap<RemoteWindowSocket::SocketCommand, RemoteWindowSocket::SocketState> R
     { RemoteWindowSocket::SC_MOUSE_PRESS,       RemoteWindowSocket::SS_PROCESS_MOUSE_PRESS      },
     { RemoteWindowSocket::SC_MOUSE_RELEASE,     RemoteWindowSocket::SS_PROCESS_MOUSE_RELEASE    },
     { RemoteWindowSocket::SC_MOUSE_CLICK,       RemoteWindowSocket::SS_PROCESS_MOUSE_CLICK      },
+    { RemoteWindowSocket::SC_KEY_PRESS,         RemoteWindowSocket::SS_PROCESS_KEY_PRESS        },
+    { RemoteWindowSocket::SC_KEY_RELEASE,       RemoteWindowSocket::SS_PROCESS_KEY_RELEASE      },
 };
 
 const char RemoteWindowSocket::MESSAGE_START_MARKER = 0x01; // Start of heading
@@ -30,7 +32,7 @@ RemoteWindowSocket::RemoteWindowSocket(QObject *parent) :
     QObject::connect(this, &QTcpSocket::readyRead, this, &RemoteWindowSocket::process);
     QObject::connect(this, &QTcpSocket::connected, [&]() {
         if(SS_NO_SESSION == sessionState_) {
-            sessionState_ = SS_JOINING;
+            setSessionState(SS_JOINING);
             sendJoinSession();
         }
     });
@@ -50,6 +52,11 @@ RemoteWindowSocket::~RemoteWindowSocket()
     }
 }
 
+RemoteWindowSocket::SessionState RemoteWindowSocket::sessionState() const
+{
+    return sessionState_;
+}
+
 void RemoteWindowSocket::sendWindowCapture(const QByteArray &data)
 {
     if(data.isEmpty())
@@ -60,7 +67,7 @@ void RemoteWindowSocket::sendWindowCapture(const QByteArray &data)
 
 void RemoteWindowSocket::sendMouseMove(const QPoint &position)
 {
-    if(sessionState_ != SS_JOINED)
+    if(SS_JOINED != sessionState_)
         return;
 
     QByteArray data;
@@ -72,7 +79,7 @@ void RemoteWindowSocket::sendMouseMove(const QPoint &position)
 
 void RemoteWindowSocket::sendMousePress(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifiers &modifiers)
 {
-    if(sessionState_ != SS_JOINED)
+    if(SS_JOINED != sessionState_)
         return;
 
     sendMouseEvent(SC_MOUSE_PRESS, button, position, modifiers);
@@ -80,7 +87,7 @@ void RemoteWindowSocket::sendMousePress(const Qt::MouseButton &button, const QPo
 
 void RemoteWindowSocket::sendMouseRelease(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifiers &modifiers)
 {
-    if(sessionState_ != SS_JOINED)
+    if(SS_JOINED != sessionState_)
         return;
 
     sendMouseEvent(SC_MOUSE_RELEASE, button, position, modifiers);
@@ -88,10 +95,26 @@ void RemoteWindowSocket::sendMouseRelease(const Qt::MouseButton &button, const Q
 
 void RemoteWindowSocket::sendMouseClick(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifiers &modifiers)
 {
-    if(sessionState_ != SS_JOINED)
+    if(SS_JOINED != sessionState_)
         return;
 
     sendMouseEvent(SC_MOUSE_CLICK, button, position, modifiers);
+}
+
+void RemoteWindowSocket::sendKeyPress(const Qt::Key &key, const Qt::KeyboardModifiers &modifiers)
+{
+    if(SS_JOINED != sessionState_)
+        return;
+
+    sendKeyEvent(SC_KEY_PRESS, key, modifiers);
+}
+
+void RemoteWindowSocket::sendKeyRelease(const Qt::Key &key, const Qt::KeyboardModifiers &modifiers)
+{
+    if(SS_JOINED != sessionState_)
+        return;
+
+    sendKeyEvent(SC_KEY_RELEASE, key, modifiers);
 }
 
 bool RemoteWindowSocket::sendMessage(const SocketCommand &command, const QByteArray &data)
@@ -110,10 +133,13 @@ bool RemoteWindowSocket::sendMessage(const SocketCommand &command, const QByteAr
 
 void RemoteWindowSocket::readMessage()
 {
+    // Yeah this kind of sucks, but it works...
     bool exit;
 
     do {
         exit = true;
+        if(buffer_.size() > BUFFER_MAX_SIZE)
+            buffer_.clear();
         buffer_.append(readAll());
 
         int indexOfStart = buffer_.indexOf(MESSAGE_START_MARKER);
@@ -126,14 +152,17 @@ void RemoteWindowSocket::readMessage()
             int payloadSize = QByteArray::fromBase64(buffer_.mid(indexOfPayloadSize + 1, indexOfPayload - indexOfPayloadSize - 1)).toInt(&ok);
             int indexOfEnd = indexOfPayload + payloadSize + 1;
 
-            if(ok && indexOfEnd < buffer_.size() && buffer_.at(indexOfEnd) == MESSAGE_END_MARKER) {
-                Message msg;
-                msg.command = static_cast<SocketCommand>(QByteArray::fromBase64(buffer_.mid(indexOfStart + 1, indexOfPayloadSize - indexOfStart - 1)).toInt());
-                msg.payload = buffer_.mid(indexOfPayload + 1, payloadSize);
-                messageQueue_.enqueue(msg);
+            if(ok && indexOfEnd < buffer_.size()) {
+                if(buffer_.at(indexOfEnd) == MESSAGE_END_MARKER) {
+                    Message msg;
+                    msg.command = static_cast<SocketCommand>(QByteArray::fromBase64(buffer_.mid(indexOfStart + 1, indexOfPayloadSize - indexOfStart - 1)).toInt());
+                    msg.payload = buffer_.mid(indexOfPayload + 1, payloadSize);
+                    messageQueue_.enqueue(msg);
 
-                buffer_.remove(indexOfStart, indexOfEnd - indexOfStart + 1);
-                exit = false;
+                    buffer_.remove(0, indexOfEnd + 1); // Remove valid message and possible garbage before message
+                    exit = false;
+                } else
+                    buffer_.clear();
             }
         }
     } while(!exit);
@@ -163,6 +192,23 @@ void RemoteWindowSocket::sendMouseEvent(const SocketCommand &command, const Qt::
     sendMessage(command, data);
 }
 
+void RemoteWindowSocket::sendKeyEvent(const SocketCommand &command, const Qt::Key &key, const Qt::KeyboardModifiers &modifiers)
+{
+    QByteArray data;
+    QDataStream stream(&data, QIODevice::WriteOnly);
+
+    stream << static_cast<int>(key) << static_cast<int>(modifiers);
+    sendMessage(command, data);
+}
+
+void RemoteWindowSocket::setSessionState(const SessionState &value)
+{
+    if(sessionState_ != value) {
+        sessionState_ = value;
+        emit sessionStateChanged();
+    }
+}
+
 void RemoteWindowSocket::process()
 {
     readMessage();
@@ -190,7 +236,7 @@ void RemoteWindowSocket::process()
 
             case SS_PROCESS_JOIN_SESSION:
                 if(SS_NO_SESSION == sessionState_) {
-                    sessionState_ = SS_JOINED;
+                    setSessionState(SS_JOINED);
                     sendJoinSessionAck();
                 }
                 // @Todo: nack
@@ -198,11 +244,11 @@ void RemoteWindowSocket::process()
                 break;
             case SS_PROCESS_JOIN_SESSION_ACK:
                 if(SS_JOINING == sessionState_)
-                    sessionState_ = SS_JOINED;
+                    setSessionState(SS_JOINED);
                 socketState_ = SS_READ_COMMAND_DONE;
                 break;
             case SS_PROCESS_LEAVE_SESSION:
-                sessionState_ = SS_NO_SESSION;
+                setSessionState(SS_NO_SESSION);
                 socketState_ = SS_READ_COMMAND_DONE;
                 break;
             case SS_PROCESS_WINDOW_CAPTURE:
@@ -235,6 +281,20 @@ void RemoteWindowSocket::process()
                 socketState_ = SS_READ_COMMAND_DONE;
                 break;
             }
+            case SS_PROCESS_KEY_PRESS:
+            case SS_PROCESS_KEY_RELEASE: {
+                int key;
+                int modifiers;
+                QDataStream stream(&message_.payload, QIODevice::ReadOnly);
+
+                stream >> key >> modifiers;
+                if(SS_PROCESS_KEY_PRESS == socketState_)
+                    emit keyPressReceived(static_cast<Qt::Key>(key), static_cast<Qt::KeyboardModifiers>(modifiers));
+                else if(SS_PROCESS_KEY_RELEASE == socketState_)
+                    emit keyReleaseReceived(static_cast<Qt::Key>(key), static_cast<Qt::KeyboardModifiers>(modifiers));
+                socketState_ = SS_READ_COMMAND_DONE;
+                break;
+            }
         }
     }
 }
@@ -246,8 +306,9 @@ void RemoteWindowSocket::onStateChanged(const QAbstractSocket::SocketState &stat
             break;
         case UnconnectedState:
             // Session lost...
+            buffer_.clear();
             if(SS_NO_SESSION != sessionState_)
-                sessionState_ = SS_NO_SESSION;
+                setSessionState(SS_NO_SESSION);
             break;
     }
 }
