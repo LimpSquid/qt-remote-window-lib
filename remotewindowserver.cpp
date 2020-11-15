@@ -113,8 +113,8 @@ void RemoteWindowServer::handleWindowUpdate()
 
     if(nullptr == screenShotFunction_) {
         QScreen *screen = QGuiApplication::primaryScreen();
-#ifdef Q_WS_WIN
-        QPixmap pixmap = screen->grabWindow(0, window_->x(), window_->y(), window_->width(), window_->height());
+#ifdef Q_OS_WIN
+        pixmap = screen->grabWindow(0, window_->x(), window_->y(), window_->width(), window_->height());
 #else
         pixmap = screen->grabWindow(window_->winId());
 #endif
