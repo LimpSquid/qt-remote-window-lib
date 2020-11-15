@@ -23,7 +23,7 @@ public:
 
     SessionState sessionState() const;
 
-    void sendWindowCapture(const QByteArray &data);
+    void sendWindowCapture(const QByteArray &compressed);
     void sendMouseMove(const QPoint &position);
     void sendMousePress(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifiers &modifiers = Qt::KeyboardModifier());
     void sendMouseRelease(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifiers &modifiers = Qt::KeyboardModifier());

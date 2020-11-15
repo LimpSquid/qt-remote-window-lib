@@ -31,8 +31,12 @@ public:
     ScreenShotFunction screenShotFunction() const;
     void setScreenShotFunction(ScreenShotFunction value);
 
+    int windowUpdateInterval() const;
+    void setWindowUpdateInterval(int value);
+
 private:
-    static const int WINDOW_UPDATE_TIME_INTERVAL;
+    static const int WINDOW_UPDATE_INTERVAL_MIN;
+    static const int WINDOW_UPDATE_INTERVAL_DEFAULT;
 
     virtual void incomingConnection(qintptr handle) override;
     virtual void timerEvent(QTimerEvent *event) override;
@@ -43,6 +47,7 @@ private:
     QList<RemoteWindowSocket *> sockets_;
     ScreenShotFunction screenShotFunction_;
     int windowUpdateTimerId_;
+    int windowUpdateInterval_;
     unsigned short port_;
 
 private slots:

@@ -57,12 +57,12 @@ RemoteWindowSocket::SessionState RemoteWindowSocket::sessionState() const
     return sessionState_;
 }
 
-void RemoteWindowSocket::sendWindowCapture(const QByteArray &data)
+void RemoteWindowSocket::sendWindowCapture(const QByteArray &compressed)
 {
-    if(data.isEmpty())
+    if(compressed.isEmpty())
         return;
 
-    sendMessage(SC_WINDOW_CAPTURE, data);
+    sendMessage(SC_WINDOW_CAPTURE, compressed);
 }
 
 void RemoteWindowSocket::sendMouseMove(const QPoint &position)
@@ -252,7 +252,7 @@ void RemoteWindowSocket::process()
                 socketState_ = SS_READ_COMMAND_DONE;
                 break;
             case SS_PROCESS_WINDOW_CAPTURE:
-                emit windowCaptureReceived(message_.payload);
+                emit windowCaptureReceived(qUncompress(message_.payload));
                 socketState_ = SS_READ_COMMAND_DONE;
                 break;
             case SS_PROCESS_MOUSE_MOVE: {

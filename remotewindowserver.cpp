@@ -6,7 +6,8 @@
 #include <QBuffer>
 #include <QTest>
 
-const int RemoteWindowServer::WINDOW_UPDATE_TIME_INTERVAL = 125; // 8fps
+const int RemoteWindowServer::WINDOW_UPDATE_INTERVAL_MIN = 20; // 50fps
+const int RemoteWindowServer::WINDOW_UPDATE_INTERVAL_DEFAULT = 125; // 8fps
 
 RemoteWindowServer::RemoteWindowServer(QObject *parent, unsigned short port) :
     QTcpServer(parent)
@@ -14,6 +15,7 @@ RemoteWindowServer::RemoteWindowServer(QObject *parent, unsigned short port) :
     window_ = nullptr;
     screenShotFunction_ = nullptr;
     windowUpdateTimerId_ = -1;
+    windowUpdateInterval_ = WINDOW_UPDATE_INTERVAL_DEFAULT;
     port_ = port;
 }
 
@@ -75,6 +77,20 @@ void RemoteWindowServer::setScreenShotFunction(ScreenShotFunction value)
     screenShotFunction_ = value;
 }
 
+int RemoteWindowServer::windowUpdateInterval() const
+{
+    return windowUpdateInterval_;
+}
+
+void RemoteWindowServer::setWindowUpdateInterval(int value)
+{
+    windowUpdateInterval_ = qMax(value, WINDOW_UPDATE_INTERVAL_MIN);
+    if(-1 != windowUpdateTimerId_) {
+        killTimer(windowUpdateTimerId_);
+        windowUpdateTimerId_ = startTimer(windowUpdateInterval_);
+    }
+}
+
 void RemoteWindowServer::incomingConnection(qintptr handle)
 {
     RemoteWindowSocket *socket = new RemoteWindowSocket(handle, this);
@@ -89,7 +105,7 @@ void RemoteWindowServer::incomingConnection(qintptr handle)
     sockets_.append(socket);
 
     if(-1 == windowUpdateTimerId_)
-        windowUpdateTimerId_ = startTimer(WINDOW_UPDATE_TIME_INTERVAL);
+        windowUpdateTimerId_ = startTimer(windowUpdateInterval_);
 }
 
 void RemoteWindowServer::timerEvent(QTimerEvent *event)
@@ -121,11 +137,12 @@ void RemoteWindowServer::handleWindowUpdate()
     } else
         pixmap = screenShotFunction_(window_);
 
-    if(!pixmap.save(&buffer, "jpeg", 30))
+    if(!pixmap.save(&buffer, "jpeg", 40))
         return;
 
+    QByteArray compressed = qCompress(data);
     for(RemoteWindowSocket *socket : sockets_)
-        socket->sendWindowCapture(data);
+        socket->sendWindowCapture(compressed);
 }
 
 void RemoteWindowServer::onSocketDisconnected()
