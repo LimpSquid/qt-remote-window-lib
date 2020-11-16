@@ -59,6 +59,8 @@ RemoteWindowSocket::SessionState RemoteWindowSocket::sessionState() const
 
 void RemoteWindowSocket::sendWindowCapture(const QByteArray &compressed)
 {
+    if(SS_JOINED != sessionState_)
+        return;
     if(compressed.isEmpty())
         return;
 

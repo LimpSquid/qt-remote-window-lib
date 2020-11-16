@@ -6,16 +6,16 @@
 #include <QBuffer>
 #include <QTest>
 
-const int RemoteWindowServer::WINDOW_UPDATE_INTERVAL_MIN = 20; // 50fps
-const int RemoteWindowServer::WINDOW_UPDATE_INTERVAL_DEFAULT = 125; // 8fps
+const int RemoteWindowServer::WINDOW_UPDATE_DELAY_MIN = 5; // In ms
+const int RemoteWindowServer::WINDOW_UPDATE_DELAY_DEFAULT = 25; // In ms
 
 RemoteWindowServer::RemoteWindowServer(QObject *parent, unsigned short port) :
     QTcpServer(parent)
 {
     window_ = nullptr;
     screenShotFunction_ = nullptr;
-    windowUpdateTimerId_ = -1;
-    windowUpdateInterval_ = WINDOW_UPDATE_INTERVAL_DEFAULT;
+    windowUpdateDelayTimerId_ = -1;
+    windowUpdateDelay_ = WINDOW_UPDATE_DELAY_DEFAULT;
     port_ = port;
 }
 
@@ -77,18 +77,14 @@ void RemoteWindowServer::setScreenShotFunction(ScreenShotFunction value)
     screenShotFunction_ = value;
 }
 
-int RemoteWindowServer::windowUpdateInterval() const
+int RemoteWindowServer::windowUpdateDelay() const
 {
-    return windowUpdateInterval_;
+    return windowUpdateDelay_;
 }
 
-void RemoteWindowServer::setWindowUpdateInterval(int value)
+void RemoteWindowServer::setWindowUpdateDelay(int value)
 {
-    windowUpdateInterval_ = qMax(value, WINDOW_UPDATE_INTERVAL_MIN);
-    if(-1 != windowUpdateTimerId_) {
-        killTimer(windowUpdateTimerId_);
-        windowUpdateTimerId_ = startTimer(windowUpdateInterval_);
-    }
+    windowUpdateDelay_ = qMax(value, WINDOW_UPDATE_DELAY_MIN);
 }
 
 void RemoteWindowServer::incomingConnection(qintptr handle)
@@ -104,14 +100,17 @@ void RemoteWindowServer::incomingConnection(qintptr handle)
     QObject::connect(socket, &RemoteWindowSocket::keyReleaseReceived, this, &RemoteWindowServer::onSocketKeyReleaseReceived);
     sockets_.append(socket);
 
-    if(-1 == windowUpdateTimerId_)
-        windowUpdateTimerId_ = startTimer(windowUpdateInterval_);
+    if(-1 == windowUpdateDelayTimerId_)
+        windowUpdateDelayTimerId_ = startTimer(windowUpdateDelay_);
 }
 
 void RemoteWindowServer::timerEvent(QTimerEvent *event)
 {
-    if(event->timerId() == windowUpdateTimerId_)
+    if(event->timerId() == windowUpdateDelayTimerId_) {
+        killTimer(windowUpdateDelayTimerId_);
         handleWindowUpdate();
+        windowUpdateDelayTimerId_ = startTimer(windowUpdateDelay_);
+    }
 }
 
 void RemoteWindowServer::handleWindowUpdate()
@@ -137,7 +136,7 @@ void RemoteWindowServer::handleWindowUpdate()
     } else
         pixmap = screenShotFunction_(window_);
 
-    if(!pixmap.save(&buffer, "jpeg", 40))
+    if(!pixmap.save(&buffer, "jpeg", 30))
         return;
 
     QByteArray compressed = qCompress(data);
@@ -153,8 +152,8 @@ void RemoteWindowServer::onSocketDisconnected()
     sockets_.removeAll(socket);
 
     if(sockets_.isEmpty()) {
-        killTimer(windowUpdateTimerId_);
-        windowUpdateTimerId_ = -1;
+        killTimer(windowUpdateDelayTimerId_);
+        windowUpdateDelayTimerId_ = -1;
     }
 }
 
