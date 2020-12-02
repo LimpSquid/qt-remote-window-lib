@@ -26,7 +26,7 @@ public:
     void setWindow(QWindow *value);
 
     unsigned short port() const;
-    void setPort(unsigned short port);
+    void setPort(unsigned short value);
 
     ScreenShotFunction screenShotFunction() const;
     void setScreenShotFunction(ScreenShotFunction value);
@@ -34,7 +34,11 @@ public:
     int windowUpdateDelay() const;
     void setWindowUpdateDelay(int value);
 
+    double quality() const;
+    void setQuality(double value);
+
 private:
+    static const double QUALITY_DEFAULT;
     static const int WINDOW_UPDATE_DELAY_MIN;
     static const int WINDOW_UPDATE_DELAY_DEFAULT;
 
@@ -46,6 +50,7 @@ private:
     QWindow *window_;
     QList<RemoteWindowSocket *> sockets_;
     ScreenShotFunction screenShotFunction_;
+    double quality_;
     int windowUpdateDelayTimerId_;
     int windowUpdateDelay_;
     unsigned short port_;

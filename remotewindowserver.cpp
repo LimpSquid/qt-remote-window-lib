@@ -6,6 +6,7 @@
 #include <QBuffer>
 #include <QTest>
 
+const double RemoteWindowServer::QUALITY_DEFAULT = 0.3; // between 0.0 and 1.0
 const int RemoteWindowServer::WINDOW_UPDATE_DELAY_MIN = 5; // In ms
 const int RemoteWindowServer::WINDOW_UPDATE_DELAY_DEFAULT = 25; // In ms
 
@@ -14,6 +15,7 @@ RemoteWindowServer::RemoteWindowServer(QObject *parent, unsigned short port) :
 {
     window_ = nullptr;
     screenShotFunction_ = nullptr;
+    quality_ = QUALITY_DEFAULT;
     windowUpdateDelayTimerId_ = -1;
     windowUpdateDelay_ = WINDOW_UPDATE_DELAY_DEFAULT;
     port_ = port;
@@ -62,9 +64,9 @@ unsigned short RemoteWindowServer::port() const
     return port_;
 }
 
-void RemoteWindowServer::setPort(unsigned short port)
+void RemoteWindowServer::setPort(unsigned short value)
 {
-    port_ = port;
+    port_ = value;
 }
 
 RemoteWindowServer::ScreenShotFunction RemoteWindowServer::screenShotFunction() const
@@ -85,6 +87,16 @@ int RemoteWindowServer::windowUpdateDelay() const
 void RemoteWindowServer::setWindowUpdateDelay(int value)
 {
     windowUpdateDelay_ = qMax(value, WINDOW_UPDATE_DELAY_MIN);
+}
+
+double RemoteWindowServer::quality() const
+{
+    return quality_;
+}
+
+void RemoteWindowServer::setQuality(double value)
+{
+    quality_ = qBound(0.0, value, 1.0);
 }
 
 void RemoteWindowServer::incomingConnection(qintptr handle)
@@ -136,7 +148,7 @@ void RemoteWindowServer::handleWindowUpdate()
     } else
         pixmap = screenShotFunction_(window_);
 
-    if(!pixmap.save(&buffer, "jpeg", 30))
+    if(!pixmap.save(&buffer, "jpeg", quality_ * 100))
         return;
 
     QByteArray compressed = qCompress(data);
