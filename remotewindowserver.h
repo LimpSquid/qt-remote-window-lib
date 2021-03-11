@@ -37,6 +37,8 @@ public:
     double quality() const;
     void setQuality(double value);
 
+    int clientCount() const;
+
 private:
     static const double QUALITY_DEFAULT;
     static const int WINDOW_UPDATE_DELAY_MIN;
@@ -45,6 +47,8 @@ private:
     virtual void incomingConnection(qintptr handle) override;
     virtual void timerEvent(QTimerEvent *event) override;
 
+    void appendSocket(RemoteWindowSocket *socket);
+    void removeSocket(RemoteWindowSocket *socket);
     void handleWindowUpdate();
 
     QWindow *window_;
@@ -54,6 +58,13 @@ private:
     int windowUpdateDelayTimerId_;
     int windowUpdateDelay_;
     unsigned short port_;
+
+signals:
+    void windowChanged();
+    void portChanged();
+    void windowUpdateDelayChanged();
+    void qualityChanged();
+    void clientCountChanged();
 
 private slots:
     void onSocketDisconnected();

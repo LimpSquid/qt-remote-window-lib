@@ -56,7 +56,10 @@ QWindow *RemoteWindowServer::window() const
 
 void RemoteWindowServer::setWindow(QWindow *value)
 {
-    window_ = value;
+    if(window_ != value) {
+        window_ = value;
+        emit windowChanged();
+    }
 }
 
 unsigned short RemoteWindowServer::port() const
@@ -66,7 +69,10 @@ unsigned short RemoteWindowServer::port() const
 
 void RemoteWindowServer::setPort(unsigned short value)
 {
-    port_ = value;
+    if(port_ != value) {
+        port_ = value;
+        emit portChanged();
+    }
 }
 
 RemoteWindowServer::ScreenShotFunction RemoteWindowServer::screenShotFunction() const
@@ -86,7 +92,12 @@ int RemoteWindowServer::windowUpdateDelay() const
 
 void RemoteWindowServer::setWindowUpdateDelay(int value)
 {
-    windowUpdateDelay_ = qMax(value, WINDOW_UPDATE_DELAY_MIN);
+    value = qMax(value, WINDOW_UPDATE_DELAY_MIN);
+
+    if(windowUpdateDelay_ != value) {
+        windowUpdateDelay_ = value;
+        emit windowUpdateDelayChanged();
+    }
 }
 
 double RemoteWindowServer::quality() const
@@ -96,7 +107,17 @@ double RemoteWindowServer::quality() const
 
 void RemoteWindowServer::setQuality(double value)
 {
-    quality_ = qBound(0.0, value, 1.0);
+    value = qBound(0.0, value, 1.0);
+
+    if(quality_ != value) {
+        quality_ = value;
+        emit qualityChanged();
+    }
+}
+
+int RemoteWindowServer::clientCount() const
+{
+    return sockets_.count();
 }
 
 void RemoteWindowServer::incomingConnection(qintptr handle)
@@ -110,7 +131,7 @@ void RemoteWindowServer::incomingConnection(qintptr handle)
     QObject::connect(socket, &RemoteWindowSocket::mouseClickReceived, this, &RemoteWindowServer::onSocketMouseClickReceived);
     QObject::connect(socket, &RemoteWindowSocket::keyPressReceived, this, &RemoteWindowServer::onSocketKeyPressReceived);
     QObject::connect(socket, &RemoteWindowSocket::keyReleaseReceived, this, &RemoteWindowServer::onSocketKeyReleaseReceived);
-    sockets_.append(socket);
+    appendSocket(socket);
 
     if(-1 == windowUpdateDelayTimerId_)
         windowUpdateDelayTimerId_ = startTimer(windowUpdateDelay_);
@@ -122,6 +143,23 @@ void RemoteWindowServer::timerEvent(QTimerEvent *event)
         killTimer(windowUpdateDelayTimerId_);
         handleWindowUpdate();
         windowUpdateDelayTimerId_ = startTimer(windowUpdateDelay_);
+    }
+}
+
+void RemoteWindowServer::appendSocket(RemoteWindowSocket *socket)
+{
+    if(nullptr == socket)
+        return;
+
+    sockets_.append(socket);
+    emit clientCountChanged();
+}
+
+void RemoteWindowServer::removeSocket(RemoteWindowSocket *socket)
+{
+    if(sockets_.contains(socket)) {
+        sockets_.removeAll(socket);
+        emit clientCountChanged();
     }
 }
 
@@ -160,8 +198,8 @@ void RemoteWindowServer::onSocketDisconnected()
 {
     RemoteWindowSocket *socket = static_cast<RemoteWindowSocket *>(QObject::sender());
 
+    removeSocket(socket);
     socket->deleteLater();
-    sockets_.removeAll(socket);
 
     if(sockets_.isEmpty()) {
         killTimer(windowUpdateDelayTimerId_);

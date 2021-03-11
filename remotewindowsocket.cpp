@@ -309,8 +309,7 @@ void RemoteWindowSocket::onStateChanged(const QAbstractSocket::SocketState &stat
         case UnconnectedState:
             // Session lost...
             buffer_.clear();
-            if(SS_NO_SESSION != sessionState_)
-                setSessionState(SS_NO_SESSION);
+            setSessionState(SS_NO_SESSION);
             break;
     }
 }
