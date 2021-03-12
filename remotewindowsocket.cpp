@@ -17,6 +17,8 @@ const QMap<RemoteWindowSocket::SocketCommand, RemoteWindowSocket::SocketState> R
     { RemoteWindowSocket::SC_KEY_RELEASE,       RemoteWindowSocket::SS_PROCESS_KEY_RELEASE      },
 };
 
+const int RemoteWindowSocket::BUFFER_MAX_SIZE = 1024 * 1024 * 20;
+const int RemoteWindowSocket::QUEUE_MAX_SIZE = 25;
 const char RemoteWindowSocket::MESSAGE_START_MARKER = 0x01; // Start of heading
 const char RemoteWindowSocket::MESSAGE_END_MARKER = 0x04; // End of transmission
 const char RemoteWindowSocket::MESSAGE_PAYLOAD_SIZE_MARKER = 0x11; // Horizontal tab
@@ -159,6 +161,9 @@ void RemoteWindowSocket::readMessage()
                     Message msg;
                     msg.command = static_cast<SocketCommand>(QByteArray::fromBase64(buffer_.mid(indexOfStart + 1, indexOfPayloadSize - indexOfStart - 1)).toInt());
                     msg.payload = buffer_.mid(indexOfPayload + 1, payloadSize);
+
+                    if(messageQueue_.count() > QUEUE_MAX_SIZE)
+                        messageQueue_.dequeue();
                     messageQueue_.enqueue(msg);
 
                     buffer_.remove(0, indexOfEnd + 1); // Remove valid message and possible garbage before message
@@ -216,7 +221,7 @@ void RemoteWindowSocket::process()
     readMessage();
 
     bool exit = false;
-    while(!exit) {
+    while(!exit && state() == QAbstractSocket::ConnectedState) {
         switch(socketState_) {
             case SS_READ_MESSAGE:
                 if(messageQueue_.isEmpty())
@@ -306,6 +311,7 @@ void RemoteWindowSocket::onStateChanged(const QAbstractSocket::SocketState &stat
     switch(state) {
         default:
             break;
+        case ClosingState:
         case UnconnectedState:
             // Session lost...
             buffer_.clear();

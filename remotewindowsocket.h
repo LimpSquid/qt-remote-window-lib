@@ -72,7 +72,8 @@ private:
     };
 
     static const QMap<SocketCommand, SocketState> SOCKET_STATE_MAPPING;
-    static const int  BUFFER_MAX_SIZE = 1024 * 1024 * 20;
+    static const int BUFFER_MAX_SIZE;
+    static const int QUEUE_MAX_SIZE;
     static const char MESSAGE_START_MARKER;
     static const char MESSAGE_END_MARKER;
     static const char MESSAGE_PAYLOAD_SIZE_MARKER;
