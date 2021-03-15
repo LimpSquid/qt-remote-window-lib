@@ -30,6 +30,7 @@ public:
     void sendMouseClick(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifiers &modifiers = Qt::KeyboardModifier());
     void sendKeyPress(const Qt::Key &key, const Qt::KeyboardModifiers &modifiers = Qt::KeyboardModifiers());
     void sendKeyRelease(const Qt::Key &key, const Qt::KeyboardModifiers &modifiers = Qt::KeyboardModifiers());
+    void sendChatMessage(QString msg);
 
 private:
     enum SocketState
@@ -48,6 +49,7 @@ private:
         SS_PROCESS_MOUSE_CLICK,
         SS_PROCESS_KEY_PRESS,
         SS_PROCESS_KEY_RELEASE,
+        SS_PROCESS_CHAT_MESSAGE,
     };
 
     enum SocketCommand
@@ -63,6 +65,7 @@ private:
         SC_MOUSE_CLICK,
         SC_KEY_PRESS,
         SC_KEY_RELEASE,
+        SC_CHAT_MESSAGE,
     };
 
     struct Message
@@ -74,6 +77,7 @@ private:
     static const QMap<SocketCommand, SocketState> SOCKET_STATE_MAPPING;
     static const int BUFFER_MAX_SIZE;
     static const int QUEUE_MAX_SIZE;
+    static const int CHAT_MSG_MAX_SIZE;
     static const char MESSAGE_START_MARKER;
     static const char MESSAGE_END_MARKER;
     static const char MESSAGE_PAYLOAD_SIZE_MARKER;
@@ -104,6 +108,7 @@ signals:
     void mouseClickReceived(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifiers &modifiers);
     void keyPressReceived(const Qt::Key &key, const Qt::KeyboardModifiers &modifiers);
     void keyReleaseReceived(const Qt::Key &key, const Qt::KeyboardModifiers &modifiers);
+    void chatMessageReceived(const QString &msg);
     void sessionStateChanged();
 
 private slots:

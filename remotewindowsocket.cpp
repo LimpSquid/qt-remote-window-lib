@@ -15,10 +15,12 @@ const QMap<RemoteWindowSocket::SocketCommand, RemoteWindowSocket::SocketState> R
     { RemoteWindowSocket::SC_MOUSE_CLICK,       RemoteWindowSocket::SS_PROCESS_MOUSE_CLICK      },
     { RemoteWindowSocket::SC_KEY_PRESS,         RemoteWindowSocket::SS_PROCESS_KEY_PRESS        },
     { RemoteWindowSocket::SC_KEY_RELEASE,       RemoteWindowSocket::SS_PROCESS_KEY_RELEASE      },
+    { RemoteWindowSocket::SC_CHAT_MESSAGE,      RemoteWindowSocket::SS_PROCESS_CHAT_MESSAGE     },
 };
 
 const int RemoteWindowSocket::BUFFER_MAX_SIZE = 1024 * 1024 * 20;
 const int RemoteWindowSocket::QUEUE_MAX_SIZE = 25;
+const int RemoteWindowSocket::CHAT_MSG_MAX_SIZE = 1024;
 const char RemoteWindowSocket::MESSAGE_START_MARKER = 0x01; // Start of heading
 const char RemoteWindowSocket::MESSAGE_END_MARKER = 0x04; // End of transmission
 const char RemoteWindowSocket::MESSAGE_PAYLOAD_SIZE_MARKER = 0x11; // Horizontal tab
@@ -119,6 +121,22 @@ void RemoteWindowSocket::sendKeyRelease(const Qt::Key &key, const Qt::KeyboardMo
         return;
 
     sendKeyEvent(SC_KEY_RELEASE, key, modifiers);
+}
+
+void RemoteWindowSocket::sendChatMessage(QString msg)
+{
+    if(SS_JOINED != sessionState_)
+        return;
+    if(msg.size() > CHAT_MSG_MAX_SIZE) {
+        msg.chop(msg.size() - CHAT_MSG_MAX_SIZE);
+        msg.append("...");
+    }
+
+    QByteArray data;
+    QDataStream stream(&data, QIODevice::WriteOnly);
+    stream << msg;
+
+    sendMessage(SC_CHAT_MESSAGE, data);
 }
 
 bool RemoteWindowSocket::sendMessage(const SocketCommand &command, const QByteArray &data)
@@ -300,6 +318,14 @@ void RemoteWindowSocket::process()
                 else if(SS_PROCESS_KEY_RELEASE == socketState_)
                     emit keyReleaseReceived(static_cast<Qt::Key>(key), static_cast<Qt::KeyboardModifiers>(modifiers));
                 socketState_ = SS_READ_COMMAND_DONE;
+                break;
+            }
+            case SS_PROCESS_CHAT_MESSAGE: {
+                QString msg;
+                QDataStream stream(&message_.payload, QIODevice::ReadOnly);
+
+                stream >> msg;
+                emit chatMessageReceived(msg);
                 break;
             }
         }

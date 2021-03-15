@@ -133,6 +133,7 @@ void RemoteWindowServer::incomingConnection(qintptr handle)
     QObject::connect(socket, &RemoteWindowSocket::keyReleaseReceived, this, &RemoteWindowServer::onSocketKeyReleaseReceived);
     appendSocket(socket);
 
+    sendChatMessage(QString("%1: joined the chat").arg(socket->localAddress().toString()));
     if(-1 == windowUpdateDelayTimerId_)
         windowUpdateDelayTimerId_ = startTimer(windowUpdateDelay_);
 }
@@ -161,6 +162,12 @@ void RemoteWindowServer::removeSocket(RemoteWindowSocket *socket)
         sockets_.removeAll(socket);
         emit clientCountChanged();
     }
+}
+
+void RemoteWindowServer::sendChatMessage(QString msg)
+{
+    for(RemoteWindowSocket *socket : sockets_)
+        socket->sendChatMessage(msg);
 }
 
 void RemoteWindowServer::handleWindowUpdate()
@@ -199,6 +206,7 @@ void RemoteWindowServer::onSocketDisconnected()
     RemoteWindowSocket *socket = static_cast<RemoteWindowSocket *>(QObject::sender());
 
     removeSocket(socket);
+    sendChatMessage(QString("%1: left the chat").arg(socket->localAddress().toString()));
     socket->deleteLater();
 
     if(sockets_.isEmpty()) {

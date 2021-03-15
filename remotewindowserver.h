@@ -49,6 +49,7 @@ private:
 
     void appendSocket(RemoteWindowSocket *socket);
     void removeSocket(RemoteWindowSocket *socket);
+    void sendChatMessage(QString msg);
     void handleWindowUpdate();
 
     QWindow *window_;
