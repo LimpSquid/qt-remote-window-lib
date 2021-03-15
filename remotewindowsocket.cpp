@@ -326,6 +326,7 @@ void RemoteWindowSocket::process()
 
                 stream >> msg;
                 emit chatMessageReceived(msg);
+                socketState_ = SS_READ_COMMAND_DONE;
                 break;
             }
         }

@@ -131,6 +131,7 @@ void RemoteWindowServer::incomingConnection(qintptr handle)
     QObject::connect(socket, &RemoteWindowSocket::mouseClickReceived, this, &RemoteWindowServer::onSocketMouseClickReceived);
     QObject::connect(socket, &RemoteWindowSocket::keyPressReceived, this, &RemoteWindowServer::onSocketKeyPressReceived);
     QObject::connect(socket, &RemoteWindowSocket::keyReleaseReceived, this, &RemoteWindowServer::onSocketKeyReleaseReceived);
+    QObject::connect(socket, &RemoteWindowSocket::chatMessageReceived, this, &RemoteWindowServer::onSocketChatMessageReceived);
     appendSocket(socket);
 
     sendChatMessage(QString("%1: joined the chat").arg(socket->localAddress().toString()));
@@ -236,7 +237,7 @@ void RemoteWindowServer::onSocketMouseReleaseReceived(const Qt::MouseButton &but
     if(nullptr == window_)
         return;
 
-    QTest::mouseRelease(window_, button, modifiers, position);    
+    QTest::mouseRelease(window_, button, modifiers, position);
 }
 
 void RemoteWindowServer::onSocketMouseClickReceived(const Qt::MouseButton &button, const QPoint &position, const Qt::KeyboardModifiers &modifiers)
@@ -261,4 +262,11 @@ void RemoteWindowServer::onSocketKeyReleaseReceived(const Qt::Key &key, const Qt
         return;
 
     QTest::keyRelease(window_, key, modifiers);
+}
+
+void RemoteWindowServer::onSocketChatMessageReceived(const QString &msg)
+{
+    RemoteWindowSocket *socket = static_cast<RemoteWindowSocket *>(QObject::sender());
+
+    sendChatMessage(QString("%1: %2").arg(socket->localAddress().toString()).arg(msg));
 }
